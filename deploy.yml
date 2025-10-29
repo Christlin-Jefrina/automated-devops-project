@@ -9,10 +9,10 @@
       kubernetes.core.k8s:
         state: present
         src: k8s/deployment.yaml 
-        kubeconfig: ~/.kube/config # The CI/CD runner will place the cluster config here
+        # REMOVED: kubeconfig: ~/.kube/config
 
     - name: Apply Kubernetes Service
       kubernetes.core.k8s:
         state: present
         src: k8s/service.yaml 
-        kubeconfig: ~/.kube/config
+        # REMOVED: kubeconfig: ~/.kube/config
