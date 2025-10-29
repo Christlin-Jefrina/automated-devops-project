@@ -1,0 +1,63 @@
+# .github/workflows/main.yml
+name: CI/CD Pipeline to AKS
+
+on:
+  push:
+    branches:
+      - master # Triggers on push to the master branch
+
+env:
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
+  RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+  CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+  IMAGE_NAME: webapp
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Azure Login & Set Context
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 2. CI Stage: Docker Build and Push to ACR (Completes Phase 2)
+      - name: Docker Login to ACR
+        run: az acr login --name ${{ env.ACR_LOGIN_SERVER }}
+
+      - name: Build and Tag image
+        run: docker build -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} .
+
+      - name: Push image to ACR
+        run: docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+      # 3. CD Stage: Connect to AKS 
+      - name: Set up kubectl context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.RESOURCE_GROUP }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          subscription: ${{ secrets.SUBSCRIPTION_ID }}
+          
+      # 4. Prepare Deployment Manifest (Injects the dynamic image tag)
+      - name: Update Kubernetes Manifest with new Image Tag
+        run: |
+          IMAGE_PATH="${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          sed -i "s|<ACR_LOGIN_SERVER>/my-web-app:latest|${IMAGE_PATH}|g" ../k8s/deployment.yaml # Note the ../k8s path correction
+
+      # 5. Deploy using Ansible Playbook (Phase 4 Execution)
+      - name: Install Ansible and dependencies
+        run: pip install ansible kubernetes
+
+      - name: Deploy to AKS using Ansible
+        run: ansible-playbook ../deploy.yml # Note the ../deploy.yml path correction
+
+      # 6. Deployment Verification (Phase 6 Objective 1/2)
+      - name: Verify Deployment Rollout
+        run: kubectl rollout status deployment/webapp-deployment --timeout=5m
