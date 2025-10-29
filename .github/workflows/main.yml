@@ -52,11 +52,12 @@ jobs:
           sed -i "s|<ACR_LOGIN_SERVER>/my-web-app:latest|${IMAGE_PATH}|g" ./k8s/deployment.yaml
 
       # 5. Deploy using Ansible Playbook (Phase 4 Execution)
+      # 5. Deploy using Ansible Playbook (Phase 4 Execution)
       - name: Install Ansible and dependencies
         run: pip install ansible kubernetes
 
       - name: Deploy to AKS using Ansible
-        run: ansible-playbook ./deploy.yml
+        run: KUBECONFIG=$KUBECONFIG ansible-playbook ./deploy.yml
 
       # 6. Deployment Verification (Phase 6 Objective 1/2)
       - name: Verify Deployment Rollout
